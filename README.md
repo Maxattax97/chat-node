@@ -1,2 +1,2 @@
-# chat-node
-A simple Node.js chat room server and client that utilizes web sockets.
+== Chat Node ==
+This README.md file is not yet finished...

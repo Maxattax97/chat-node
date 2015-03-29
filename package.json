@@ -1,0 +1,21 @@
+{
+  "name": "chat-node",
+  "version": "0.0.1",
+  "description": "A simple chat room server and client that utilizes web sockets.",
+  "main": "host.js",
+  "scripts": {
+    "test": "node test.js"
+  },
+  "keywords": [
+    "chat",
+    "web",
+    "socket",
+    "client",
+    "host"
+  ],
+  "author": "Max O'Cull",
+  "license": "MIT",
+  "dependencies": {
+    "ws": "^0.7.1"
+  }
+}
