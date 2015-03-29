@@ -1,5 +1,5 @@
 var WebSocketServer = require('ws').Server,
-    wss = new WebSocketServer({ port: 80});
+    wss = new WebSocketServer({ port: 8080});
 
 var users = [];
 var currentId = 1;
@@ -25,8 +25,8 @@ function Message(name, id, text, type) {
 function removeUser(user) {
     var i = users.indexOf(user);
     if (i > -1) {
+        users[i] = null;
         users.splice(i, 1);
-        broadcast('Server', null, user.name + ' has disconnected.', 'message');
     }
 }
 
@@ -52,13 +52,28 @@ function userList() {
         if (i + 1 < users.length)
             list += ', ';
     }
+    if (users.length === 0)
+        list = 'None';
     return list;
 }
 
 function broadcast(name, id, text, type) {
-    wss.clients.forEach(function (client) {
-        sendMessage(client, name, id, text, type);
+    users.forEach(function (client) {
+        sendMessage(client.ws, name, id, text, type);
     });
+}
+
+function disconnect(user) {
+    var name = user.name;
+    try {
+        user.ws.close();
+    } catch (e) {
+        console.error('[ERROR]: ' + e);
+    }
+    removeUser(user);
+    broadcast('Server', null, name + ' has disconnected.', 'message');
+    console.log('User ' + name + ' has disconnected.');
+    console.log('Users online: ' + userList() + '.');
 }
 
 function formatMessage(name, time, message) {
@@ -68,28 +83,23 @@ function formatMessage(name, time, message) {
 };
 
 wss.on('connection', function (ws) {
-    //console.log('connection opened');
+    var scopeUser;
+
     ws.on('message', function (data) {
         var msg = JSON.parse(data);
-        //console.log('recieved: ' + data);
         if (msg.type === 'join') {
-            console.log('user ' + msg.name + ' has joined');
+            console.log('User ' + msg.name + ' has joined.');
             var u = new User(msg.name, ws);
+            scopeUser = u;
             sendMessage(ws, 'Server', null, u.id + '', 'join');
             broadcast('Server', null, u.name + ' has joined the server!', 'message');
         } else if (msg.type === 'message') {
             console.log(formatMessage(msg.name, msg.time, msg.text));
             broadcast(msg.name, msg.id, msg.text, msg.type);
         } else if (msg.type === 'ping') {
-            var u = getUser(msg.name, msg.id);
-            u.connected = true;
-        } else if (msg.type === 'leave') {
-            var u = getUser(msg.name, msg.id);
-            removeUser(u);
-            broadcast('Server', null, msg.name + ' has left the server.', 'message');
-            console.log(msg.name + ' has left the server');
-            console.log('Users online: \n' + userList());
+            scopeUser.connected = true;
         } else if (msg.type === 'command') {
+            console.log('User ' + msg.name + ' attempted to use the command /' + msg.text + '.');
             switch (msg.text) {
                 case 'list':
                     sendMessage(ws, 'Server', null, userList());
@@ -115,22 +125,27 @@ wss.on('connection', function (ws) {
     });
 
     ws.on('error', function(e) {
-        console.log(e.data);
+        console.error('[ERROR]: ' + e);
+    });
+
+    ws.on('close', function(e) {
+        if (getUser(scopeUser.name, scopeUser.id) !== null)
+            disconnect(scopeUser);
     });
 });
 
 wss.on('error', function(e) {
-    console.log(e.data);
+    console.error('[ERROR]: ' + e);
 });
 
 setInterval(function () {
     for (var i = 0; i < users.length; i++) {
         var u = users[i];
         if (u.connected === false) {
-            u.ws.close();
-            removeUser(u);
+            disconnect(u);
+        } else {
+            u.connected = false;
+            sendMessage(u.ws, 'Server', null, '', 'ping');
         }
-        u.connected = false;
-        sendMessage(u.ws, 'Server', null, '', 'ping');
     }
-}, 5000);
+}, 1000);

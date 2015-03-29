@@ -8,7 +8,7 @@ var chatBar;
 var chatSend;
 var form;
 
-var url = "ws://127.0.0.1/"; //"ws://vm.codefromjames.com"
+var url = 'ws://vm.codefromjames.com:8080';
 var ws;
 
 // CORE
@@ -29,19 +29,22 @@ function randomizeName() {
 }
 
 
-function initialize() {
+function initialize(nm) {
     nameTag = document.getElementById("nameTag");
     chatLog = document.getElementById("chatLog");
     chatBar = document.getElementById("chatBar");
     chatSend = document.getElementById("chatSend");
     form = document.getElementById("form");
 
-    chatLog.value = "";
+    //chatLog.value = "";
 
-    var randomName = randomizeName();
-    name = prompt("Enter an alias:", randomName) || randomName;
+    if (nm === undefined || nm === null) {
+        var randomName = randomizeName();
+        name = prompt("Enter an alias:", randomName) || randomName;
+    } else
+        name = nm;
     nameTag.innerHTML = name + ":";
-    chatLog.value = "Connecting...";
+    chatLog.value += "Connecting...";
 
     ws = new WebSocket(url);
 
@@ -53,7 +56,11 @@ function initialize() {
 
     ws.onopen = function() {
         sendMessage(name, null, "", "join");
-        //chatLog.value = "You have joined the server!";
+    }
+
+    ws.onclose = function() {
+        writeLog('Client', Date.now(), 'Connection lost.\n');
+        initialize(name);
     }
 
     ws.onmessage = function(e) {
@@ -66,8 +73,6 @@ function initialize() {
             sendMessage(name, id, "", "ping");
         } else if (msg.type === "message") {
             writeLog(msg.name, msg.time, msg.text);
-        } else if (msg.type === "leave") {
-            writeLog(msg.text);
         } else if (msg.type === "command") {
             switch (msg.text) {
                 case 'flash':
@@ -120,7 +125,6 @@ function initialize() {
 
     window.onbeforeunload = function() {
         ws.onclose = function () {}; // Disable onclose event
-        sendMessage(name, id, "", "leave");
         ws.close();
     };
 }
